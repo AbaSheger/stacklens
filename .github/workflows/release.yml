@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: temurin
+          cache: maven
+
+      - name: Build JAR
+        run: mvn --batch-mode clean package -DskipTests
+
+      - name: Rename JAR
+        run: mv target/stacklens-*.jar target/stacklens.jar
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: StackLens ${{ github.ref_name }}
+          body: |
+            ## StackLens ${{ github.ref_name }}
+
+            ### Download & Run
+
+            **Requirements:** Java 17 or higher
+
+            ```bash
+            # Download stacklens.jar from the assets below, then:
+            java -jar stacklens.jar analyze app.log
+            java -jar stacklens.jar analyze --text "java.lang.NullPointerException at MyService.java:42"
+            ```
+
+            ### Optional: Create an alias
+
+            **Linux/macOS** — add to `~/.bashrc` or `~/.zshrc`:
+            ```bash
+            alias stacklens='java -jar /path/to/stacklens.jar'
+            ```
+
+            **Windows PowerShell** — add to your `$PROFILE`:
+            ```powershell
+            function stacklens { java -jar C:\path\to\stacklens.jar $args }
+            ```
+          files: target/stacklens.jar
+          draft: false
+          prerelease: false

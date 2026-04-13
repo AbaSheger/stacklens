@@ -51,7 +51,22 @@ It's fast, offline, and works with any Java or Spring Boot application.
 ### Prerequisites
 
 - Java 17 or higher
-- Maven 3.8 or higher (to build from source)
+
+### Download (Recommended)
+
+Download the latest pre-built JAR from the [Releases page](https://github.com/AbaSheger/stacklens/releases/latest).
+
+**Linux/macOS:**
+```bash
+curl -L https://github.com/AbaSheger/stacklens/releases/latest/download/stacklens.jar -o stacklens.jar
+java -jar stacklens.jar analyze app.log
+```
+
+**Windows PowerShell:**
+```powershell
+Invoke-WebRequest https://github.com/AbaSheger/stacklens/releases/latest/download/stacklens.jar -OutFile stacklens.jar
+java -jar stacklens.jar analyze app.log
+```
 
 ### Build from Source
 
