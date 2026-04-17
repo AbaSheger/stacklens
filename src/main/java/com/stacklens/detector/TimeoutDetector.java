@@ -1,36 +1,26 @@
 package com.stacklens.detector;
 
 import com.stacklens.model.Issue;
+import com.stacklens.model.Severity;
 
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Detects timeout errors in log lines.
- *
- * Matches patterns like:
- *   SocketTimeoutException
- *   Read timed out
- *   Connection timed out
- *   Timeout waiting for connection from pool
- *   Gateway Timeout
- */
 public class TimeoutDetector implements IssueDetector {
 
     @Override
-    public String getIssueType() {
-        return "TimeoutError";
-    }
+    public String getIssueType() { return "TimeoutError"; }
+
+    @Override
+    public Severity getSeverity() { return Severity.WARNING; }
 
     @Override
     public Optional<Issue> detect(String line) {
-        if (line == null) {
-            return Optional.empty();
-        }
+        if (line == null) return Optional.empty();
 
         String lower = line.toLowerCase();
 
-        boolean isTimeout =
+        boolean match =
             lower.contains("sockettimeoutexception") ||
             lower.contains("read timed out") ||
             lower.contains("connection timed out") ||
@@ -40,12 +30,12 @@ public class TimeoutDetector implements IssueDetector {
             lower.contains("request timeout") ||
             lower.contains("connect timeout");
 
-        if (isTimeout) {
-            Issue issue = new Issue(
+        if (match) {
+            return Optional.of(new Issue(
                 getIssueType(),
-                "A timeout occurred while waiting for a response. " +
-                "This can happen when a remote service, database, or external API " +
-                "takes longer to respond than the configured timeout threshold.",
+                getSeverity(),
+                "A timeout occurred while waiting for a response from a remote service, " +
+                "database, or external API — it took longer than the configured threshold.",
                 List.of(
                     "Increase the timeout value if the operation is expected to take longer",
                     "Investigate why the downstream service is responding slowly",
@@ -55,8 +45,7 @@ public class TimeoutDetector implements IssueDetector {
                     "Ensure external APIs and services are healthy"
                 ),
                 line.trim()
-            );
-            return Optional.of(issue);
+            ));
         }
 
         return Optional.empty();

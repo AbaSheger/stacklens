@@ -1,5 +1,6 @@
 package com.stacklens.output;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -11,15 +12,19 @@ import java.util.List;
 /**
  * Formats analysis results as JSON.
  *
- * Useful for piping StackLens output into other tools or scripts.
- *
  * Example output:
  * {
  *   "source": "app.log",
- *   "issueCount": 1,
+ *   "issueCount": 2,
+ *   "totalOccurrences": 55,
  *   "issues": [
  *     {
  *       "issue": "NullPointerException",
+ *       "severity": "ERROR",
+ *       "occurrences": 47,
+ *       "location": "OrderService.processOrder(OrderService.java:142)",
+ *       "matchedLine": "java.lang.NullPointerException: ...",
+ *       "stackContext": ["at com.example...", ...],
  *       "explanation": "...",
  *       "suggestions": ["..."]
  *     }
@@ -32,54 +37,59 @@ public class JsonFormatter {
 
     public JsonFormatter() {
         objectMapper = new ObjectMapper();
-        // Pretty-print the JSON output for readability
         objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
+        // Omit null fields (e.g. location when not found)
+        objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
     }
 
-    /**
-     * Formats an analysis result as a JSON string.
-     *
-     * @param result the analysis result to format
-     * @return pretty-printed JSON string
-     * @throws RuntimeException if JSON serialization fails (should not happen in practice)
-     */
     public String format(AnalysisResult result) {
         try {
-            JsonOutput output = buildJsonOutput(result);
-            return objectMapper.writeValueAsString(output);
+            return objectMapper.writeValueAsString(buildJsonOutput(result));
         } catch (Exception e) {
-            // This is an internal error — the models we use are always serializable
             throw new RuntimeException("Failed to serialize result to JSON", e);
         }
     }
 
-    /** Maps an AnalysisResult to our JSON output structure. */
     private JsonOutput buildJsonOutput(AnalysisResult result) {
+        int totalOccurrences = result.getIssues().stream()
+            .mapToInt(Issue::getOccurrenceCount)
+            .sum();
+
         List<JsonIssue> jsonIssues = result.getIssues().stream()
             .map(this::toJsonIssue)
             .toList();
 
-        return new JsonOutput(result.getSource(), jsonIssues.size(), jsonIssues);
+        return new JsonOutput(result.getSource(), jsonIssues.size(), totalOccurrences, jsonIssues);
     }
 
-    /** Maps a single Issue to its JSON representation. */
     private JsonIssue toJsonIssue(Issue issue) {
-        return new JsonIssue(issue.getType(), issue.getExplanation(), issue.getSuggestions());
+        return new JsonIssue(
+            issue.getType(),
+            issue.getSeverity().name(),
+            issue.getOccurrenceCount(),
+            issue.getLocation(),
+            issue.getMatchedLine(),
+            issue.getStackContext().isEmpty() ? null : issue.getStackContext(),
+            issue.getExplanation(),
+            issue.getSuggestions()
+        );
     }
 
-    // ── Internal record classes for JSON serialization ──────────────────────
-
-    /** Top-level JSON output structure. */
     record JsonOutput(
-        @JsonProperty("source") String source,
-        @JsonProperty("issueCount") int issueCount,
-        @JsonProperty("issues") List<JsonIssue> issues
+        @JsonProperty("source")           String source,
+        @JsonProperty("issueCount")        int issueCount,
+        @JsonProperty("totalOccurrences")  int totalOccurrences,
+        @JsonProperty("issues")            List<JsonIssue> issues
     ) {}
 
-    /** JSON structure for a single detected issue. */
     record JsonIssue(
-        @JsonProperty("issue") String issue,
-        @JsonProperty("explanation") String explanation,
-        @JsonProperty("suggestions") List<String> suggestions
+        @JsonProperty("issue")         String issue,
+        @JsonProperty("severity")      String severity,
+        @JsonProperty("occurrences")   int occurrences,
+        @JsonProperty("location")      String location,
+        @JsonProperty("matchedLine")   String matchedLine,
+        @JsonProperty("stackContext")  List<String> stackContext,
+        @JsonProperty("explanation")   String explanation,
+        @JsonProperty("suggestions")   List<String> suggestions
     ) {}
 }

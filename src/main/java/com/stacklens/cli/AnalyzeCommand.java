@@ -17,7 +17,9 @@ import java.util.concurrent.Callable;
  * Usage examples:
  *   stacklens analyze app.log
  *   stacklens analyze app.log --output json
+ *   stacklens analyze app.log --summary
  *   stacklens analyze --text "java.lang.NullPointerException at OrderService"
+ *   kubectl logs my-pod | stacklens analyze -
  */
 @Command(
     name = "analyze",
@@ -26,18 +28,18 @@ import java.util.concurrent.Callable;
 )
 public class AnalyzeCommand implements Callable<Integer> {
 
-    /** Path to the log file to analyze. Optional if --text is provided instead. */
+    /**
+     * Path to the log file to analyze.
+     * Use "-" to read from stdin (e.g. piped from kubectl logs or docker logs).
+     */
     @Parameters(
         index = "0",
-        description = "Path to the log file to analyze.",
+        description = "Path to the log file to analyze, or '-' to read from stdin.",
         arity = "0..1"
     )
-    private Path logFile;
+    private String logFilePath;
 
-    /**
-     * Inline text mode: pass a stack trace or log snippet directly.
-     * Use instead of a file path.
-     */
+    /** Inline text mode: pass a stack trace or log snippet directly. */
     @Option(
         names = {"--text", "-t"},
         description = "Analyze inline text (stack trace or log snippet) instead of a file."
@@ -45,8 +47,7 @@ public class AnalyzeCommand implements Callable<Integer> {
     private String inlineText;
 
     /**
-     * Output format. Defaults to "human" (readable terminal output).
-     * Use "json" for machine-readable output.
+     * Output format. Defaults to "human". Use "json" for machine-readable output.
      */
     @Option(
         names = {"--output", "-o"},
@@ -56,9 +57,17 @@ public class AnalyzeCommand implements Callable<Integer> {
     private String outputFormat;
 
     /**
-     * Whether to use ANSI color codes in terminal output.
-     * Defaults to true. Set to false for plain text (useful in CI or log files).
+     * Summary mode: show a compact one-line-per-issue table with counts and locations.
+     * Mutually exclusive with --output json.
      */
+    @Option(
+        names = {"--summary", "-s"},
+        description = "Show a compact summary table instead of full issue details.",
+        defaultValue = "false"
+    )
+    private boolean summary;
+
+    /** Disable ANSI color codes in output — useful in CI or when writing to a log file. */
     @Option(
         names = {"--no-color"},
         description = "Disable ANSI color codes in output.",
@@ -68,15 +77,18 @@ public class AnalyzeCommand implements Callable<Integer> {
 
     @Override
     public Integer call() {
-        // Validate: user must provide either a file OR inline text
-        if (logFile == null && inlineText == null) {
-            System.err.println("Error: Provide a log file path or use --text to pass inline text.");
-            System.err.println("Example: stacklens analyze app.log");
-            System.err.println("Example: stacklens analyze --text \"NullPointerException at OrderService\"");
+        boolean isStdin = "-".equals(logFilePath);
+
+        if (logFilePath == null && inlineText == null) {
+            System.err.println("Error: Provide a log file path, '-' for stdin, or use --text.");
+            System.err.println("Examples:");
+            System.err.println("  stacklens analyze app.log");
+            System.err.println("  stacklens analyze --text \"NullPointerException at OrderService\"");
+            System.err.println("  kubectl logs my-pod | stacklens analyze -");
             return 1;
         }
 
-        if (logFile != null && inlineText != null) {
+        if (logFilePath != null && inlineText != null) {
             System.err.println("Error: Provide either a file path or --text, not both.");
             return 1;
         }
@@ -85,35 +97,33 @@ public class AnalyzeCommand implements Callable<Integer> {
             LogAnalyzer analyzer = new LogAnalyzer();
             AnalysisResult result;
 
-            if (logFile != null) {
-                result = analyzer.analyzeFile(logFile);
+            if (isStdin) {
+                result = analyzer.analyzeStream(System.in, "stdin");
+            } else if (logFilePath != null) {
+                result = analyzer.analyzeFile(Path.of(logFilePath));
             } else {
                 result = analyzer.analyzeText(inlineText);
             }
 
-            // Print the result in the requested format
-            String output = formatResult(result);
-            System.out.println(output);
+            System.out.println(formatResult(result));
 
-            // Exit code: 0 = no issues, 2 = issues found (useful for scripting)
             return result.hasIssues() ? 2 : 0;
 
         } catch (java.nio.file.NoSuchFileException e) {
             System.err.println("Error: File not found: " + e.getMessage());
             return 1;
         } catch (java.io.IOException e) {
-            System.err.println("Error reading file: " + e.getMessage());
+            System.err.println("Error reading input: " + e.getMessage());
             return 1;
         }
     }
 
-    /** Formats the result according to the --output flag. */
     private String formatResult(AnalysisResult result) {
         if ("json".equalsIgnoreCase(outputFormat)) {
             return new JsonFormatter().format(result);
         }
-        // Default: human-readable output with optional colors
         boolean useColors = !noColor;
-        return new HumanReadableFormatter(useColors).format(result);
+        HumanReadableFormatter formatter = new HumanReadableFormatter(useColors);
+        return summary ? formatter.formatSummary(result) : formatter.format(result);
     }
 }

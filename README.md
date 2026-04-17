@@ -1,48 +1,97 @@
 # StackLens
 
-**A CLI developer tool that analyzes Java and Spring Boot logs or stack traces and explains the root cause of errors — with suggested fixes.**
+> Point it at a log. Know what's broken, where, and how to fix it — in seconds.
 
 [![CI](https://github.com/AbaSheger/stacklens/actions/workflows/ci.yml/badge.svg)](https://github.com/AbaSheger/stacklens/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Java 17+](https://img.shields.io/badge/Java-17%2B-blue.svg)](https://adoptium.net/)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/AbaSheger/stacklens/releases)
+
+![StackLens demo](docs/demo.gif)
+
+---
+
+```
+$ java -jar stacklens.jar analyze app.log
+
+StackLens Analysis Report — Source: app.log
+────────────────────────────────────────────────────────────
+✗ 3 issue type(s) detected  (73 total occurrences)
+  1 CRITICAL   1 ERROR   1 WARNING
+
+[CRITICAL]  Issue #1: SpringBeanFailure
+
+  Location:  UserServiceConfig.configure(UserServiceConfig.java:34)
+
+  Explanation:
+    Spring failed to start. A bean could not be created because a
+    required dependency is missing or misconfigured.
+
+  Suggested fixes:
+    1. Check the full startup log — the root cause is usually a few lines below
+    2. Ensure all @Component classes are in a package scanned by @SpringBootApplication
+    ...
+
+[ERROR]  Issue #2: NullPointerException  ×47
+
+  Location:  OrderService.createOrder(OrderService.java:42)
+  ...
+
+[WARNING]  Issue #3: TimeoutError  ×25
+
+  Location:  OrderRepository.findAll(OrderRepository.java:88)
+  ...
+```
 
 ---
 
 ## Why StackLens?
 
-Debugging production logs is slow and repetitive. You scan hundreds of lines, recognize the same patterns over and over, and Google the same error messages every time.
+You open a production log. There are 800 lines. Somewhere in there is the reason your service went down at 3am.
 
-StackLens automates that first step. Point it at a log file or paste a stack trace, and it tells you:
+StackLens reads the log and tells you:
 
-- **What** the problem is
-- **Why** it happens
-- **How** to fix it
+| Without StackLens | With StackLens |
+|---|---|
+| Scroll through 800 lines | Instant summary |
+| Grep for exception names | Exact class + line number |
+| Google the error | Explanation + fixes inline |
+| No idea how often it happened | `NullPointerException ×47` |
+| Works per-request | Pipe `kubectl logs` straight in |
 
-It's fast, offline, and works with any Java or Spring Boot application.
+It's offline, dependency-free, and works with any Java or Spring Boot application.
 
 ---
 
 ## Features
 
-- Analyze log **files** or **paste stack traces** directly
-- Detects **8 common backend failure types** out of the box
+- Analyze log **files**, **paste stack traces**, or **pipe from stdin** (`kubectl logs`, `docker logs`)
+- Detects **13 common backend failure types** out of the box
+- **Severity levels**: CRITICAL / ERROR / WARNING so you know what to fix first
+- **Occurrence counting**: "NullPointerException ×47" tells you how bad it really is
+- **Stack trace context**: shows the first app-owned frame so you know exactly where to look
+- **`--summary` mode**: one-line-per-issue table for quick triage
 - Outputs **human-readable** or **JSON** format
-- **Deduplicates** repeated errors — each issue type reported once
 - **Exit codes** for scripting: `0` = clean, `2` = issues found
 - Extensible: add new detectors by implementing one interface
 
 ### Detected Error Types
 
-| Error Type | Example Pattern |
-|---|---|
-| `NullPointerException` | `java.lang.NullPointerException at ...` |
-| `DatabaseConnectionFailure` | `Unable to acquire JDBC Connection` |
-| `TimeoutError` | `SocketTimeoutException: Read timed out` |
-| `ConnectionRefused` | `Connection refused: localhost:8080` |
-| `OutOfMemoryError` | `OutOfMemoryError: Java heap space` |
-| `AuthenticationError` | `401 Unauthorized`, `Bad credentials`, `JWT expired` |
-| `ThreadPoolExhaustion` | `RejectedExecutionException: Task rejected` |
-| `Http500InternalServerError` | `500 Internal Server Error` |
+| Severity | Error Type | Example Pattern |
+|---|---|---|
+| CRITICAL | `OutOfMemoryError` | `OutOfMemoryError: Java heap space` |
+| CRITICAL | `ThreadPoolExhaustion` | `RejectedExecutionException: Task rejected` |
+| CRITICAL | `StackOverflowError` | `java.lang.StackOverflowError` |
+| CRITICAL | `SpringBeanFailure` | `NoSuchBeanDefinitionException`, `BeanCreationException` |
+| ERROR | `NullPointerException` | `java.lang.NullPointerException at ...` |
+| ERROR | `DatabaseConnectionFailure` | `Unable to acquire JDBC Connection` |
+| ERROR | `ConnectionRefused` | `Connection refused: localhost:8080` |
+| ERROR | `LazyInitializationException` | `could not initialize proxy - no Session` |
+| ERROR | `ClassCastException` | `cannot be cast to` |
+| ERROR | `ConcurrentModificationException` | `java.util.ConcurrentModificationException` |
+| ERROR | `Http500InternalServerError` | `500 Internal Server Error` |
+| WARNING | `TimeoutError` | `SocketTimeoutException: Read timed out` |
+| WARNING | `AuthenticationError` | `401 Unauthorized`, `Bad credentials`, `JWT expired` |
 
 ---
 
@@ -108,6 +157,19 @@ java -jar stacklens.jar analyze app.log
 java -jar stacklens.jar analyze --text "java.lang.NullPointerException at OrderService.java:42"
 ```
 
+### Pipe from stdin (kubectl, docker, etc.)
+
+```bash
+kubectl logs my-pod | java -jar stacklens.jar analyze -
+docker logs my-container | java -jar stacklens.jar analyze -
+```
+
+### Quick summary table
+
+```bash
+java -jar stacklens.jar analyze app.log --summary
+```
+
 ### Output as JSON
 
 ```bash
@@ -138,42 +200,70 @@ StackLens Analysis Report
 Source: samples/sample-npe.log
 ────────────────────────────────────────────────────────────
 
-✗ 1 issue(s) detected:
+✗ 1 issue type(s) detected (1 total occurrence(s))
+  1 ERROR
 
 ────────────────────────────────────────────────────────────
-Issue #1: NullPointerException
+[ERROR]  Issue #1: NullPointerException
+
+Location:
+  OrderService.createOrder(OrderService.java:42)
 
 Detected in:
   java.lang.NullPointerException: Cannot invoke "com.example.User.getEmail()" because "user" is null
+  at com.example.OrderService.createOrder(OrderService.java:42)
+  at com.example.OrderController.createOrder(OrderController.java:28)
+  at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+  ... 2 more frame(s)
 
 Explanation:
-  A null object reference was accessed in the application.
-  This happens when code tries to call a method or access a
-  field on an object that has not been initialized (is null).
+  A null object reference was accessed. This happens when code calls a
+  method or accesses a field on an object that has not been initialized
+  (is null).
 
 Suggested fixes:
   1. Ensure all objects are properly initialized before use
   2. Add null checks before accessing object fields or methods
   3. Use Optional<T> to express that a value may be absent
   4. Validate method parameters at the start of each method
-  5. Check if a dependency injection (e.g. @Autowired) is missing
+  5. Check if a dependency injection (e.g. @Autowired) is missing or failed
+```
+
+### Summary Mode (`--summary`)
+
+```
+StackLens Summary — Source: app.log
+──────────────────────────────────────────────────────────────────────
+
+4 issue type(s)  •  73 total occurrence(s)
+
+[CRITICAL]     SpringBeanFailure                   ×1    —
+[CRITICAL]     ThreadPoolExhaustion                ×3    RequestDispatcher.dispatch(RequestDispatcher.java:88)
+[ERROR]        NullPointerException                ×47   OrderService.createOrder(OrderService.java:42)
+[WARNING]      TimeoutError                        ×22   OrderRepository.findAll(OrderRepository.java:33)
 ```
 
 ### JSON Output
 
 ```json
 {
-  "source" : "samples/sample-npe.log",
-  "issueCount" : 1,
-  "issues" : [ {
-    "issue" : "NullPointerException",
-    "explanation" : "A null object reference was accessed in the application. ...",
-    "suggestions" : [
+  "source": "samples/sample-npe.log",
+  "issueCount": 1,
+  "totalOccurrences": 1,
+  "issues": [ {
+    "issue": "NullPointerException",
+    "severity": "ERROR",
+    "occurrences": 1,
+    "location": "OrderService.createOrder(OrderService.java:42)",
+    "matchedLine": "java.lang.NullPointerException: ...",
+    "stackContext": [
+      "at com.example.OrderService.createOrder(OrderService.java:42)",
+      "at com.example.OrderController.createOrder(OrderController.java:28)"
+    ],
+    "explanation": "A null object reference was accessed...",
+    "suggestions": [
       "Ensure all objects are properly initialized before use",
-      "Add null checks before accessing object fields or methods",
-      "Use Optional<T> to express that a value may be absent",
-      "Validate method parameters at the start of each method",
-      "Check if a dependency injection (e.g. @Autowired) is missing"
+      "Add null checks before accessing object fields or methods"
     ]
   } ]
 }
@@ -298,13 +388,12 @@ mvn test
 
 ## Roadmap
 
-- [ ] **AI explanations** — use an LLM API to generate context-aware explanations
+- [ ] **AI explanations** — use an LLM API to generate context-aware, code-specific explanations
 - [ ] **Spring Boot structured logs** — parse JSON log format from Logback
-- [ ] **Kubernetes log support** — analyze `kubectl logs` output with pod context
-- [ ] **Plugin system** — load custom detectors from external JARs
 - [ ] **Watch mode** — tail a log file and detect issues in real time
-- [ ] **Severity levels** — classify issues as CRITICAL / WARNING / INFO
+- [ ] **Plugin system** — load custom detectors from external JARs
 - [ ] **HTML report** — generate a standalone HTML report file
+- [ ] **IntelliJ / VS Code plugin** — surface StackLens output inside the IDE
 
 ---
 

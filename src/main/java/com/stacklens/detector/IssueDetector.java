@@ -1,6 +1,7 @@
 package com.stacklens.detector;
 
 import com.stacklens.model.Issue;
+import com.stacklens.model.Severity;
 
 import java.util.Optional;
 
@@ -20,6 +21,8 @@ public interface IssueDetector {
 
     /**
      * Analyzes a single log line and returns an Issue if a problem is detected.
+     * The returned Issue carries type, severity, explanation, and suggestions.
+     * The classifier will enrich it with occurrence count, stack context, and location.
      *
      * @param line a single line from the log or stack trace
      * @return an Optional containing the detected Issue, or empty if no match
@@ -31,4 +34,9 @@ public interface IssueDetector {
      * Used for display and deduplication.
      */
     String getIssueType();
+
+    /**
+     * Returns the severity of issues this detector produces.
+     */
+    Severity getSeverity();
 }

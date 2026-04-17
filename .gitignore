@@ -47,6 +47,10 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
+# ── Scripts / Node ───────────────────────────────────────────────────────────
+scripts/node_modules/
+scripts/package-lock.json
+
 # ── Misc ─────────────────────────────────────────────────────────────────────
 *.swp
 *.swo

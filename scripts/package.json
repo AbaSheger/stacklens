@@ -1,0 +1,14 @@
+{
+  "name": "stacklens-scripts",
+  "version": "1.0.0",
+  "description": "Scripts for generating StackLens demo assets",
+  "scripts": {
+    "generate-demo": "node generate-demo.mjs"
+  },
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "ansi-to-html": "^0.7.2",
+    "fluent-ffmpeg": "^2.1.3",
+    "playwright": "^1.44.0"
+  }
+}

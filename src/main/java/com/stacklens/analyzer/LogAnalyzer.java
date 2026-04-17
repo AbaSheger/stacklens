@@ -4,18 +4,19 @@ import com.stacklens.classifier.IssueClassifier;
 import com.stacklens.model.AnalysisResult;
 import com.stacklens.model.Issue;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
- * Reads log content (from file or text) and coordinates analysis.
- *
- * LogAnalyzer is the entry point for analysis. It handles I/O
- * (reading files or splitting pasted text) and delegates detection
- * to IssueClassifier.
+ * Reads log content (from file, stdin, or inline text) and coordinates analysis.
  */
 public class LogAnalyzer {
 
@@ -25,36 +26,27 @@ public class LogAnalyzer {
         this.classifier = new IssueClassifier();
     }
 
-    // Package-private constructor for testing with a custom classifier
     LogAnalyzer(IssueClassifier classifier) {
         this.classifier = classifier;
     }
 
-    /**
-     * Reads a log file from disk and analyzes its contents.
-     *
-     * @param filePath path to the log file
-     * @return analysis result containing all detected issues
-     * @throws IOException if the file cannot be read
-     */
+    /** Reads a log file from disk and analyzes its contents. */
     public AnalysisResult analyzeFile(Path filePath) throws IOException {
         List<String> lines = Files.readAllLines(filePath);
-        List<Issue> issues = classifier.classify(lines);
-        return new AnalysisResult(filePath.toString(), issues);
+        return new AnalysisResult(filePath.toString(), classifier.classify(lines));
     }
 
-    /**
-     * Analyzes a stack trace or log text pasted directly as a string.
-     *
-     * The text is split into individual lines for analysis.
-     *
-     * @param text the raw log or stack trace text
-     * @return analysis result containing all detected issues
-     */
+    /** Reads from an InputStream (e.g. System.in when using stdin mode). */
+    public AnalysisResult analyzeStream(InputStream stream, String sourceLabel) throws IOException {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+            List<String> lines = reader.lines().collect(Collectors.toList());
+            return new AnalysisResult(sourceLabel, classifier.classify(lines));
+        }
+    }
+
+    /** Analyzes a stack trace or log text pasted directly as a string. */
     public AnalysisResult analyzeText(String text) {
-        // Split on newlines; handle both Unix (\n) and Windows (\r\n) line endings
         List<String> lines = Arrays.asList(text.split("\\r?\\n"));
-        List<Issue> issues = classifier.classify(lines);
-        return new AnalysisResult("inline text", issues);
+        return new AnalysisResult("inline text", classifier.classify(lines));
     }
 }
