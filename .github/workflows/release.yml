@@ -30,12 +30,27 @@ jobs:
       - name: Rename JAR
         run: mv target/stacklens-*.jar target/stacklens.jar
 
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # Extract the block between this version header and the next
+          NOTES=$(awk "/^## \[$VERSION\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
+          {
+            echo "notes<<EOF"
+            echo "$NOTES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: StackLens ${{ github.ref_name }}
           body: |
-            ## StackLens ${{ github.ref_name }}
+            ## What's changed in ${{ github.ref_name }}
+            ${{ steps.changelog.outputs.notes }}
+
+            ---
 
             ### Download & Run
 
@@ -44,6 +59,8 @@ jobs:
             ```bash
             # Download stacklens.jar from the assets below, then:
             java -jar stacklens.jar analyze app.log
+            java -jar stacklens.jar analyze app.log --summary
+            cat app.log | java -jar stacklens.jar analyze -
             java -jar stacklens.jar analyze --text "java.lang.NullPointerException at MyService.java:42"
             ```
 
