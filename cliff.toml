@@ -1,0 +1,44 @@
+[changelog]
+header = """
+# Changelog\n
+All notable changes to StackLens will be documented in this file.\n
+"""
+body = """
+{% if version %}\
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## [Unreleased]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim | upper_first }}
+{% for commit in commits %}
+- {{ commit.message | upper_first | trim }}\
+{% endfor %}
+{% endfor %}\n
+"""
+trim = true
+footer = ""
+
+[git]
+conventional_commits = false
+filter_unconventional = false
+split_commits = false
+commit_parsers = [
+  { message = "^feat", group = "Added" },
+  { message = "^add", group = "Added" },
+  { message = "^fix", group = "Fixed" },
+  { message = "^bug", group = "Fixed" },
+  { message = "^refactor", group = "Changed" },
+  { message = "^perf", group = "Changed" },
+  { message = "^ci", group = "CI" },
+  { message = "^docs", group = "Documentation" },
+  { message = "^test", group = "Testing" },
+  { message = "^chore", skip = true },
+  { message = "^Merge", skip = true },
+]
+filter_commits = false
+tag_pattern = "v[0-9]*"
+skip_tags = ""
+ignore_tags = ""
+topo_order = false
+sort_commits = "oldest"
