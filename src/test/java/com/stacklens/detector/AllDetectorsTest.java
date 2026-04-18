@@ -2,7 +2,6 @@ package com.stacklens.detector;
 
 import com.stacklens.model.Issue;
 import org.junit.jupiter.api.Test;
-
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -148,6 +147,50 @@ class AllDetectorsTest {
     @Test
     void http500Detector_doesNotMatchCleanLine() {
         IssueDetector detector = new Http500Detector();
+        assertFalse(detector.detect(CLEAN_LINE).isPresent());
+    }
+
+    @Test
+    void transactionErrorDetector_detectsTransactionSystemException() {
+        IssueDetector detector = new TransactionErrorDetector();
+        String line = "org.springframework.transaction.TransactionSystemException: Could not commit JPA transaction";
+
+        Optional<Issue> result = detector.detect(line);
+
+        assertTrue(result.isPresent());
+        assertEquals("TransactionError", result.get().getType());
+    }
+
+    @Test
+    void transactionErrorDetector_detectsRollbackException() {
+        IssueDetector detector = new TransactionErrorDetector();
+        String line = "jakarta.persistence.RollbackException: Transaction marked as rollbackOnly";
+
+        assertTrue(detector.detect(line).isPresent());
+    }
+
+    @Test
+    void transactionErrorDetector_detectsCouldNotExecuteStatement() {
+        IssueDetector detector = new TransactionErrorDetector();
+        String line = "org.hibernate.exception.ConstraintViolationException: could not execute statement";
+
+        assertTrue(detector.detect(line).isPresent());
+    }
+
+    @Test
+    void transactionErrorDetector_detectsSpringTransactionPackageLine() {
+        IssueDetector detector = new TransactionErrorDetector();
+        String line = "at org.springframework.transaction.interceptor.TransactionAspectSupport.completeTransactionAfterThrowing(TransactionAspectSupport.java:688)";
+
+        Optional<Issue> result = detector.detect(line);
+
+        assertTrue(result.isPresent());
+        assertEquals("TransactionError", result.get().getType());
+    }
+
+    @Test
+    void transactionErrorDetector_doesNotMatchCleanLine() {
+        IssueDetector detector = new TransactionErrorDetector();
         assertFalse(detector.detect(CLEAN_LINE).isPresent());
     }
 }
