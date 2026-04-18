@@ -23,8 +23,8 @@ public class TransactionErrorDetector implements IssueDetector {
         boolean match =
             lower.contains("transactionsystemexception") ||
             lower.contains("rollbackexception") ||
-            lower.contains("could not execute statement") ||
-            lower.contains("org.springframework.transaction");
+            lower.contains("cannotcreatetransactionexception") ||
+            lower.contains("could not execute statement");
 
         if (match) {
             return Optional.of(new Issue(
