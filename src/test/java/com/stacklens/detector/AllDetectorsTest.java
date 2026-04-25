@@ -150,4 +150,51 @@ class AllDetectorsTest {
         IssueDetector detector = new Http500Detector();
         assertFalse(detector.detect(CLEAN_LINE).isPresent());
     }
+
+    @Test
+    void fileSystemErrorDetector_detectsFileNotFoundException() {
+        IssueDetector detector = new FileSystemErrorDetector();
+        String line = "java.io.FileNotFoundException: /config/settings.json";
+
+        Optional<Issue> result = detector.detect(line);
+
+        assertTrue(result.isPresent());
+        assertEquals("FileSystemException", result.get().getType());
+    }
+
+    @Test
+    void fileSystemErrorDetector_detectsAccessDeniedException() {
+        IssueDetector detector = new FileSystemErrorDetector();
+        String line = "java.nio.file.AccessDeniedException: /data/upload (Permission denied)";
+
+        Optional<Issue> result = detector.detect(line);
+
+        assertTrue(result.isPresent());
+    }
+
+    @Test
+    void fileSystemErrorDetector_detectsNoSuchFileOrDirectory() {
+        IssueDetector detector = new FileSystemErrorDetector();
+        String line = "java.io.FileNotFoundException: /app/logs/app.log (No such file or directory)";
+
+        Optional<Issue> result = detector.detect(line);
+
+        assertTrue(result.isPresent());
+    }
+
+    @Test
+    void fileSystemErrorDetector_detectsPermissionDenied() {
+        IssueDetector detector = new FileSystemErrorDetector();
+        String line = "java.io.FileNotFoundException: /tmp/test.txt (Permission denied)";
+
+        Optional<Issue> result = detector.detect(line);
+
+        assertTrue(result.isPresent());
+    }
+
+    @Test
+    void fileSystemErrorDetector_doesNotMatchCleanLine() {
+        IssueDetector detector = new FileSystemErrorDetector();
+        assertFalse(detector.detect(CLEAN_LINE).isPresent());
+    }
 }
