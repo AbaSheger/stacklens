@@ -57,6 +57,7 @@ public class IssueClassifier {
         detectors.add(new ConcurrentModificationDetector());
         detectors.add(new Http500Detector());
         detectors.add(new FileSystemErrorDetector());
+        detectors.add(new TransactionErrorDetector());
 
         // WARNING severity
         detectors.add(new TimeoutDetector());

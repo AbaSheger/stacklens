@@ -170,6 +170,7 @@ class AllDetectorsTest {
         Optional<Issue> result = detector.detect(line);
 
         assertTrue(result.isPresent());
+        assertEquals("FileSystemException", result.get().getType());
     }
 
     @Test
@@ -180,6 +181,7 @@ class AllDetectorsTest {
         Optional<Issue> result = detector.detect(line);
 
         assertTrue(result.isPresent());
+        assertEquals("FileSystemException", result.get().getType());
     }
 
     @Test
@@ -190,11 +192,59 @@ class AllDetectorsTest {
         Optional<Issue> result = detector.detect(line);
 
         assertTrue(result.isPresent());
+        assertEquals("FileSystemException", result.get().getType());
     }
 
     @Test
     void fileSystemErrorDetector_doesNotMatchCleanLine() {
         IssueDetector detector = new FileSystemErrorDetector();
+        assertFalse(detector.detect(CLEAN_LINE).isPresent());
+    }
+
+    @Test
+    void transactionErrorDetector_detectsTransactionSystemException() {
+        IssueDetector detector = new TransactionErrorDetector();
+        String line = "org.springframework.transaction.TransactionSystemException: Could not commit JPA transaction";
+
+        Optional<Issue> result = detector.detect(line);
+
+        assertTrue(result.isPresent());
+        assertEquals("TransactionError", result.get().getType());
+    }
+
+    @Test
+    void transactionErrorDetector_detectsRollbackException() {
+        IssueDetector detector = new TransactionErrorDetector();
+        String line = "jakarta.persistence.RollbackException: Transaction marked as rollbackOnly";
+
+        Optional<Issue> result = detector.detect(line);
+
+        assertTrue(result.isPresent());
+        assertEquals("TransactionError", result.get().getType());
+    }
+
+    @Test
+    void transactionErrorDetector_detectsCouldNotExecuteStatement() {
+        IssueDetector detector = new TransactionErrorDetector();
+        String line = "org.hibernate.exception.ConstraintViolationException: could not execute statement";
+
+        Optional<Issue> result = detector.detect(line);
+
+        assertTrue(result.isPresent());
+        assertEquals("TransactionError", result.get().getType());
+    }
+
+    @Test
+    void transactionErrorDetector_doesNotMatchSpringTransactionStackFrameAlone() {
+        IssueDetector detector = new TransactionErrorDetector();
+        String line = "at org.springframework.transaction.interceptor.TransactionAspectSupport.completeTransactionAfterThrowing(TransactionAspectSupport.java:688)";
+
+        assertFalse(detector.detect(line).isPresent());
+    }
+
+    @Test
+    void transactionErrorDetector_doesNotMatchCleanLine() {
+        IssueDetector detector = new TransactionErrorDetector();
         assertFalse(detector.detect(CLEAN_LINE).isPresent());
     }
 }
