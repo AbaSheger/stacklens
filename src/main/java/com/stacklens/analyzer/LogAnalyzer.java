@@ -1,8 +1,8 @@
 package com.stacklens.analyzer;
 
-import com.stacklens.classifier.IssueClassifier;
+import com.stacklens.JSONlogs.LogProcessor; 
 import com.stacklens.model.AnalysisResult;
-import com.stacklens.model.Issue;
+import com.stacklens.classifier.IssueClassifier;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -15,38 +15,49 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Reads log content (from file, stdin, or inline text) and coordinates analysis.
- */
 public class LogAnalyzer {
 
     private final IssueClassifier classifier;
+    private final LogProcessor logProcessor; 
 
     public LogAnalyzer() {
         this.classifier = new IssueClassifier();
+        this.logProcessor = new LogProcessor(); 
     }
 
     LogAnalyzer(IssueClassifier classifier) {
         this.classifier = classifier;
+        this.logProcessor = new LogProcessor();
     }
 
-    /** Reads a log file from disk and analyzes its contents. */
+    private List<String> preprocessLines(List<String> lines) {
+        return lines.stream()
+                .map(line -> {
+                    if (logProcessor.isJsonLog(line)) {
+                        return logProcessor.parseToPlainText(line);
+                    }
+                    return line; 
+                }).flatMap(line -> Arrays.stream(line.split("\\r?\\n")))
+                .collect(Collectors.toList());
+    }
+
     public AnalysisResult analyzeFile(Path filePath) throws IOException {
         List<String> lines = Files.readAllLines(filePath);
-        return new AnalysisResult(filePath.toString(), classifier.classify(lines));
+        List<String> processedLines = preprocessLines(lines); 
+        return new AnalysisResult(filePath.toString(), classifier.classify(processedLines));
     }
 
-    /** Reads from an InputStream (e.g. System.in when using stdin mode). */
     public AnalysisResult analyzeStream(InputStream stream, String sourceLabel) throws IOException {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
             List<String> lines = reader.lines().collect(Collectors.toList());
-            return new AnalysisResult(sourceLabel, classifier.classify(lines));
+            List<String> processedLines = preprocessLines(lines);
+            return new AnalysisResult(sourceLabel, classifier.classify(processedLines));
         }
     }
 
-    /** Analyzes a stack trace or log text pasted directly as a string. */
     public AnalysisResult analyzeText(String text) {
         List<String> lines = Arrays.asList(text.split("\\r?\\n"));
-        return new AnalysisResult("inline text", classifier.classify(lines));
+        List<String> processedLines = preprocessLines(lines);
+        return new AnalysisResult("inline text", classifier.classify(processedLines));
     }
 }
