@@ -18,21 +18,32 @@ public class LogProcessor {
         try {
             JsonLogStructure jsonLog = objectMapper.readValue(logLine, JsonLogStructure.class);
             StringBuilder plainText = new StringBuilder();
-            
-            if (jsonLog.message() != null) {
-                plainText.append(jsonLog.message());
-            }
-            if (jsonLog.stackTrace() != null && !jsonLog.stackTrace().isEmpty()) {
-                plainText.append("\n").append(jsonLog.stackTrace());
-            }
-            return plainText.toString();
+
+            appendField(plainText, jsonLog.timestamp());
+            appendField(plainText, jsonLog.level());
+            appendField(plainText, jsonLog.message());
+            appendField(plainText, jsonLog.stackTrace());
+
+            return plainText.isEmpty() ? logLine : plainText.toString();
         } catch (Exception e) {
             return logLine;
         }
     }
 
+    private void appendField(StringBuilder plainText, String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        if (!plainText.isEmpty()) {
+            plainText.append("\n");
+        }
+        plainText.append(value);
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     record JsonLogStructure(
+        @JsonProperty("timestamp") String timestamp,
+        @JsonProperty("level") String level,
         @JsonProperty("message") String message,
         @JsonProperty("stack_trace") String stackTrace
     ) {}
